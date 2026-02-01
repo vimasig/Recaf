@@ -202,23 +202,10 @@ public class ResourceWatchingService implements Service, WorkspaceOpenListener, 
 
                 // Register parent directories for all watched files
                 Map<Path, WatchKey> registeredDirs = new ConcurrentHashMap<>();
-                for (WatchEntry entry : watchedPaths.values()) {
-                    Path parentDir = entry.path().getParent();
-                    if (parentDir != null && !registeredDirs.containsKey(parentDir)) {
-                        try {
-                            WatchKey key = parentDir.register(watchService,
-                                    StandardWatchEventKinds.ENTRY_MODIFY);
-                            registeredDirs.put(parentDir, key);
-                            logger.trace("Registered watch on directory: {}", parentDir);
-                        } catch (IOException ex) {
-                            logger.warn("Failed to register watch on directory: {}", parentDir, ex);
-                        }
-                    }
-                }
+                registerWatches(registeredDirs);
 
                 if (registeredDirs.isEmpty()) {
-                    logger.debug("No directories could be registered for watching");
-                    return;
+                    logger.debug("No directories could be registered for watching initially, will keep trying...");
                 }
 
                 // Process events
@@ -232,8 +219,10 @@ public class ResourceWatchingService implements Service, WorkspaceOpenListener, 
                         break;
                     }
 
-                    if (key == null)
+                    if (key == null) {
+                        registerWatches(registeredDirs);
                         continue;
+                    }
 
                     for (WatchEvent<?> event : key.pollEvents()) {
                         WatchEvent.Kind<?> kind = event.kind();
@@ -272,9 +261,6 @@ public class ResourceWatchingService implements Service, WorkspaceOpenListener, 
                         logger.warn("Watch key became invalid");
                         // Remove from registered dirs
                         registeredDirs.values().remove(key);
-                        if (registeredDirs.isEmpty()) {
-                            break;
-                        }
                     }
                 }
 
@@ -283,6 +269,24 @@ public class ResourceWatchingService implements Service, WorkspaceOpenListener, 
                 logger.error("IO exception in resource watch service", ex);
             } catch (ClosedWatchServiceException ignored) {
                 // Expected when watch service is closed
+            }
+        }
+
+        private void registerWatches(@Nonnull Map<Path, WatchKey> registeredDirs) {
+            for (WatchEntry entry : watchedPaths.values()) {
+                Path parentDir = entry.path().getParent();
+                if (parentDir != null && !registeredDirs.containsKey(parentDir)) {
+                    if (Files.isDirectory(parentDir)) {
+                        try {
+                            WatchKey key = parentDir.register(watchService,
+                                    StandardWatchEventKinds.ENTRY_MODIFY);
+                            registeredDirs.put(parentDir, key);
+                            logger.trace("Registered watch on directory: {}", parentDir);
+                        } catch (IOException ex) {
+                            logger.warn("Failed to register watch on directory: {}", parentDir, ex);
+                        }
+                    }
+                }
             }
         }
 
