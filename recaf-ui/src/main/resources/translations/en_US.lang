@@ -490,6 +490,7 @@ deobf.tree.generic.anticrasher=Anti-Crasher
 deobf.tree.generic.optimize=Optimization
 deobf.tree.generic.restoration=Restoration
 deobf.tree.specific=Specific
+deobf.tree.plugin-provided=Plugin
 deobf.apply=Transform workspace
 
 ## Mapping application
@@ -570,6 +571,9 @@ service.analysis.jphantom-generator-config.generate-workspace-phantoms=Generate 
 service.analysis.search-config=Search
 service.analysis.entry-points=Entry points
 service.analysis.entry-points.none=No entries found
+service.analysis.hashing=Hashing
+service.analysis.hashing.type=Type
+service.analysis.hashing.value=Hash
 service.analysis.anti-decompile=Anti-Decompilation
 service.analysis.anti-decompile.illegal-attr=Illegal attributes
 service.analysis.anti-decompile.illegal-name=Illegal names

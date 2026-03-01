@@ -1,6 +1,5 @@
 package software.coley.recaf.services.deobfuscation;
 
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import software.coley.recaf.services.deobfuscation.transform.generic.CallResultInliningTransformer;
 import software.coley.recaf.services.deobfuscation.transform.generic.DeadCodeRemovingTransformer;
@@ -55,6 +54,73 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 				""";
 		validateAfterAssembly(asm, List.of(OpaqueConstantFoldingTransformer.class), dis -> {
 			assertEquals(1, StringUtil.count("iconst_0", dis), "Expected to fold to 0");
+		});
+	}
+
+	@Test
+	void foldUnknownIntegerMath() {
+		String asm = """
+				.method public static example (I)I {
+					parameters: { x },
+				    code: {
+				    A:
+				        // x + 0 --> x
+				        iload x
+				        iconst_0
+				        iadd
+				
+				        // x * 1 --> x
+				        iconst_1
+				        imul
+				
+				        // x / 1 --> x
+				        iconst_1
+				        idiv
+				
+				        // x | 0 --> x
+				        iconst_0
+				        ior
+				
+				        // x & -1 --> x
+				        iconst_m1
+				        iand
+				
+				        // x ^ 0 --> x
+				        iconst_0
+				        ixor
+				
+				        // (x << 0) --> x
+				        iconst_0
+				        ishl
+				
+				        // (x >> 0) --> x
+				        iconst_0
+				        ishr
+				
+				        // (x >>> 0) --> x
+				        iconst_0
+				        iushr
+				
+				        ireturn
+				    B:
+				    }
+				}
+				""";
+		validateAfterAssembly(asm, List.of(OpaqueConstantFoldingTransformer.class), dis -> {
+			// Should fold to just "return x"
+			assertEquals(0, StringUtil.count("iconst_0", dis));
+			assertEquals(0, StringUtil.count("iconst_1", dis));
+			assertEquals(0, StringUtil.count("iconst_m1", dis));
+			assertEquals(0, StringUtil.count("iadd", dis));
+			assertEquals(0, StringUtil.count("imul", dis));
+			assertEquals(0, StringUtil.count("idiv", dis));
+			assertEquals(0, StringUtil.count("ior", dis));
+			assertEquals(0, StringUtil.count("iand", dis));
+			assertEquals(0, StringUtil.count("ixor", dis));
+			assertEquals(0, StringUtil.count("ishl", dis));
+			assertEquals(0, StringUtil.count("ishr", dis));
+			assertEquals(0, StringUtil.count("iushr", dis));
+			assertEquals(1, StringUtil.count("iload x", dis));
 		});
 	}
 
@@ -216,6 +282,49 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 			assertEquals(0, StringUtil.count("swap", dis), "Expected to stack operation");
 			assertEquals(0, StringUtil.count("ishl", dis), "Expected to math operation");
 			assertEquals(1, StringUtil.count("bipush 16", dis), "Expected to fold to 16 from (2 << 3)");
+		});
+
+		// Similar again, but with more stack manipulation.
+		asm = """
+				.method public static example ()I {
+				    code: {
+				    A:
+				        iconst_1 // [1]
+				        iconst_2 // [1, 2]
+				        swap     // [2, 1]
+				        swap     // [1, 2]
+				        swap     // [2, 1]
+				        dup2     // [2, 1, 2, 1]
+				        swap     // [2, 1, 1, 2]
+				        pop2     // [2, 1]
+				        swap     // [1, 2]
+				        dup2     // [1, 2, 1, 2]
+				        swap     // [1, 2, 2, 1]
+				        dup2_x2  // [2, 1, 1, 2, 2, 1]
+				        pop      // [2, 1, 1, 2, 2]
+				        imul     // [2, 1, 1, 4]
+				        swap     // [2, 1, 4, 1]
+				        iconst_1 // [2, 1, 4, 1, 1]
+				        iadd     // [2, 1, 4, 2]
+				        swap     // [2, 1, 2, 4]
+				        dup_x2   // [2, 4, 1, 2, 4]
+				        pop2     // [2, 4, 1]
+				        ishl     // [2, 8]
+				        swap     // [8, 2]
+				        imul     // [16]
+				        ireturn
+				    B:
+				    }
+				}
+				""";
+		validateAfterAssembly(asm, List.of(OpaqueConstantFoldingTransformer.class), dis -> {
+			assertEquals(0, StringUtil.count("dup", dis));
+			assertEquals(0, StringUtil.count("swap", dis));
+			assertEquals(0, StringUtil.count("pop", dis));
+			assertEquals(0, StringUtil.count("iadd", dis));
+			assertEquals(0, StringUtil.count("imul", dis));
+			assertEquals(0, StringUtil.count("ishl", dis));
+			assertEquals(1, StringUtil.count("bipush 16", dis), "Expected to fold to 16");
 		});
 	}
 
@@ -2263,8 +2372,6 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 	}
 
 	@Test
-	@Disabled
-	/** TODO: Enable after fixing {@link #doNotFoldVarUsedInComparisonIfOriginalPossiblyUpdates()} */
 	void foldVarWithRedundantCopyVariable() {
 		String asm = """
 				.method public example ()I {
@@ -2353,8 +2460,6 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 	}
 
 	@Test
-	@Disabled
-	/** TODO: Enable after fixing {@link #doNotFoldVarUsedInComparisonIfOriginalPossiblyUpdates()} */
 	void foldVarWithWideRedundantCopyVariable() {
 		String asm = """
 				.method public static example (J)I {
@@ -2380,7 +2485,6 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 	}
 
 	@Test
-	@Disabled
 	void doNotFoldVarUsedInComparisonIfOriginalPossiblyUpdates() {
 		String asm = """
 				.method public static example (I)I {
@@ -2408,7 +2512,6 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 	}
 
 	@Test
-	@Disabled
 	void foldVarWithSeriesOfRedundantBackToBackCycledWrites() {
 		String asm = """
 				.method public example ()I {
@@ -2445,7 +2548,6 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 	}
 
 	@Test
-	@Disabled
 	void foldVarRedundantInitialization() {
 		String asm = """
 				.method public static example (II)I {
@@ -2499,7 +2601,7 @@ public class FoldingDeobfuscationTest extends BaseDeobfuscationTest {
 				    }
 				}
 				""";
-		validateAfterAssembly(asm, List.of(
+		validateAfterRepeatedAssembly(asm, List.of(
 				VariableFoldingTransformer.class,
 				OpaquePredicateFoldingTransformer.class,
 				OpaqueConstantFoldingTransformer.class,

@@ -25,6 +25,7 @@ import software.coley.recaf.util.ReflectUtil;
  * 		Node type.
  *
  * @author Matt Coley
+ * @see AutoScrollPane
  */
 public class VirtualizedScrollPaneWrapper<V extends Region & Virtualized> extends VirtualizedScrollPane<V> {
 	private static final double AUTO_SCROLL_MULTIPLIER = 0.1;

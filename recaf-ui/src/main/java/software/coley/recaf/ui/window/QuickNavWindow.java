@@ -601,7 +601,11 @@ public class QuickNavWindow extends AbstractIdentifiableStage {
 			} else {
 				containmentSearch(search, tempResultsList);
 			}
-			tempResultsList.sort(Comparator.naturalOrder());
+			try {
+				tempResultsList.sort(Comparator.naturalOrder());
+			} catch (Throwable t) {
+				logger.warn("Failed to sort search results, falling back to unsorted display", t);
+			}
 			results.list.setAll(tempResultsList);
 		}
 
